@@ -81,9 +81,10 @@ struct SettingsView: View {
         }
         .onReceive(scheduleManager.objectWillChange) { _ in
             DispatchQueue.main.async {
-                NSApp.windows
-                    .first { $0.title == "Slacktive Settings" }?
-                    .makeKeyAndOrderFront(nil)
+                if let window = NSApp.windows.first(where: { $0.title == "Slacktive Settings" }) {
+                    window.makeKeyAndOrderFront(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                }
             }
         }
     }
@@ -96,7 +97,9 @@ struct SettingsView: View {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            // Silently fail - user can toggle again
+            print("Launch at login error: \(error)")
+            // Revert the toggle to reflect actual state
+            launchAtLogin = SMAppService.mainApp.status == .enabled
         }
     }
 }

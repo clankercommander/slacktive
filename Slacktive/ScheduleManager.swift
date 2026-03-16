@@ -60,6 +60,11 @@ final class ScheduleManager: ObservableObject {
         return currentMinutes >= startMinutes && currentMinutes < endMinutes
     }
 
+    func applyScheduleNow() {
+        guard isScheduleEnabled else { return }
+        onScheduleChange?(isWithinSchedule)
+    }
+
     private func startMonitoring() {
         checkTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             guard let self, self.isScheduleEnabled else { return }

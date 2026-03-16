@@ -59,7 +59,13 @@ struct MenuBarView: View {
             Divider()
 
             // Buttons
-            Button(action: { openWindow(id: "settings") }) {
+            Button(action: {
+                // Delay to let the MenuBarExtra popover dismiss first
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    openWindow(id: "settings")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }) {
                 HStack {
                     Image(systemName: "gear")
                     Text("Settings")
@@ -82,6 +88,10 @@ struct MenuBarView: View {
         .onAppear {
             setupScheduleBinding()
         }
+        .onDisappear {
+            // Reset manual override when popover closes so schedule can resume control
+            manualOverride = false
+        }
     }
 
     private var scheduleDescription: String {
@@ -97,19 +107,13 @@ struct MenuBarView: View {
     }
 
     private func setupScheduleBinding() {
+        // Override the app-level binding with one that respects manual override
         scheduleManager.onScheduleChange = { shouldBeActive in
             guard !manualOverride else { return }
             if shouldBeActive && !activityManager.isActive {
                 activityManager.start()
             } else if !shouldBeActive && activityManager.isActive {
                 activityManager.stop()
-            }
-        }
-
-        // Apply schedule on launch
-        if scheduleManager.isScheduleEnabled && !manualOverride {
-            if scheduleManager.isWithinSchedule {
-                activityManager.start()
             }
         }
     }
