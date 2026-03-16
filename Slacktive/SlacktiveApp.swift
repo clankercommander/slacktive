@@ -15,7 +15,8 @@ struct SlacktiveApp: App {
         .menuBarExtraStyle(.window)
 
         Window("Slacktive Settings", id: "settings") {
-            SettingsView(scheduleManager: scheduleManager)
+            SettingsView()
+                .environmentObject(scheduleManager)
         }
         .windowResizability(.contentSize)
         .defaultSize(width: 320, height: 360)

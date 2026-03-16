@@ -2,9 +2,8 @@ import SwiftUI
 import ServiceManagement
 
 struct SettingsView: View {
-    @ObservedObject var scheduleManager: ScheduleManager
+    @EnvironmentObject var scheduleManager: ScheduleManager
     @State private var launchAtLogin = false
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
