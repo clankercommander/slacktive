@@ -17,6 +17,7 @@ struct SettingsView: View {
             // Schedule Section
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Enable Schedule", isOn: $scheduleManager.isScheduleEnabled)
+                    .tint(.green)
                     .toggleStyle(.switch)
 
                 if scheduleManager.isScheduleEnabled {
@@ -58,6 +59,7 @@ struct SettingsView: View {
 
             // Launch at Login
             Toggle("Launch at Login", isOn: $launchAtLogin)
+                .tint(.green)
                 .toggleStyle(.switch)
                 .onChange(of: launchAtLogin) { newValue in
                     setLaunchAtLogin(newValue)

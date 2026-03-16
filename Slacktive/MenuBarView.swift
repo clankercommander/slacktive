@@ -40,6 +40,7 @@ struct MenuBarView: View {
             )) {
                 Text("Stay Active")
             }
+            .tint(.green)
             .toggleStyle(.switch)
 
             // Schedule indicator
