@@ -1,6 +1,10 @@
 # Slacktive
 
-A tiny macOS menu bar app that keeps you looking "active" on Slack. No more going "away" because you stepped away from your keyboard for 5 minutes.
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![macOS](https://img.shields.io/badge/macOS-13%2B-blue.svg)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/Swift-5-orange.svg)](https://swift.org/)
+
+A free, open-source macOS menu bar app that keeps you looking "active" on Slack. No more going "away" because you stepped away from your keyboard for 5 minutes.
 
 <!-- ![Slacktive screenshot](assets/screenshot.png) -->
 
@@ -62,6 +66,10 @@ Slacktive prevents this by:
 
 The movements are randomized in both timing (30-120s) and direction (1-2px) to appear natural. The cursor moves slightly, then immediately returns to its original position.
 
+## Contributing
+
+Contributions are welcome! Feel free to open an issue or submit a pull request.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE) for details.
