@@ -79,6 +79,13 @@ struct SettingsView: View {
         .onAppear {
             launchAtLogin = SMAppService.mainApp.status == .enabled
         }
+        .onReceive(scheduleManager.objectWillChange) { _ in
+            DispatchQueue.main.async {
+                NSApp.windows
+                    .first { $0.title == "Slacktive Settings" }?
+                    .makeKeyAndOrderFront(nil)
+            }
+        }
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
