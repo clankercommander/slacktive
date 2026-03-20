@@ -1,4 +1,7 @@
 import SwiftUI
+import os.log
+
+private let logger = Logger(subsystem: "com.slacktive.app", category: "App")
 
 @main
 struct SlacktiveApp: App {
@@ -6,11 +9,18 @@ struct SlacktiveApp: App {
     @StateObject private var scheduleManager = ScheduleManager()
 
     init() {
-        // Wire up schedule → activity binding at launch so it works
-        // even before the user opens the menu bar popover
+        // Note: Accessing _wrappedValue during init is necessary to wire up the
+        // schedule → activity binding before the first SwiftUI render. This is a
+        // known pattern for inter-StateObject communication during App.init().
         let schedule = _scheduleManager.wrappedValue
         let activity = _activityManager.wrappedValue
-        schedule.onScheduleChange = { shouldBeActive in
+        schedule.onScheduleChange = { [weak activity] shouldBeActive in
+            guard let activity else { return }
+            // Don't override the user's manual toggle
+            guard !activity.manualOverride else {
+                logger.info("Schedule change ignored — manual override is active")
+                return
+            }
             if shouldBeActive && !activity.isActive {
                 activity.start()
             } else if !shouldBeActive && activity.isActive {
@@ -19,6 +29,7 @@ struct SlacktiveApp: App {
         }
         // Apply schedule immediately on launch
         schedule.applyScheduleNow()
+        logger.info("Slacktive app launched")
     }
 
     var body: some Scene {

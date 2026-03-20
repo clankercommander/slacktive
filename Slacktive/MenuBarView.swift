@@ -5,7 +5,6 @@ struct MenuBarView: View {
     @ObservedObject var activityManager: ActivityManager
     @ObservedObject var scheduleManager: ScheduleManager
     @Environment(\.openWindow) private var openWindow
-    @State private var manualOverride = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -34,8 +33,7 @@ struct MenuBarView: View {
             Toggle(isOn: Binding(
                 get: { activityManager.isActive },
                 set: { newValue in
-                    manualOverride = true
-                    if newValue { activityManager.start() } else { activityManager.stop() }
+                    if newValue { activityManager.manualStart() } else { activityManager.manualStop() }
                 }
             )) {
                 Text("Stay Active")
@@ -63,7 +61,11 @@ struct MenuBarView: View {
                 // Delay to let the MenuBarExtra popover dismiss first
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     openWindow(id: "settings")
-                    NSApp.activate(ignoringOtherApps: true)
+                    if #available(macOS 14.0, *) {
+                        NSApp.activate()
+                    } else {
+                        NSApp.activate(ignoringOtherApps: true)
+                    }
                 }
             }) {
                 HStack {
@@ -85,13 +87,6 @@ struct MenuBarView: View {
         }
         .padding()
         .frame(width: 240)
-        .onAppear {
-            setupScheduleBinding()
-        }
-        .onDisappear {
-            // Reset manual override when popover closes so schedule can resume control
-            manualOverride = false
-        }
     }
 
     private var scheduleDescription: String {
@@ -100,21 +95,23 @@ struct MenuBarView: View {
             .map { ScheduleManager.dayNames[$0 - 1] }
             .joined(separator: ", ")
 
-        let startStr = String(format: "%d:%02d", scheduleManager.startHour, scheduleManager.startMinute)
-        let endStr = String(format: "%d:%02d", scheduleManager.endHour, scheduleManager.endMinute)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+
+        let startStr: String
+        if let startDate = Calendar.current.date(from: DateComponents(hour: scheduleManager.startHour, minute: scheduleManager.startMinute)) {
+            startStr = formatter.string(from: startDate)
+        } else {
+            startStr = String(format: "%d:%02d", scheduleManager.startHour, scheduleManager.startMinute)
+        }
+
+        let endStr: String
+        if let endDate = Calendar.current.date(from: DateComponents(hour: scheduleManager.endHour, minute: scheduleManager.endMinute)) {
+            endStr = formatter.string(from: endDate)
+        } else {
+            endStr = String(format: "%d:%02d", scheduleManager.endHour, scheduleManager.endMinute)
+        }
 
         return "\(days) \(startStr)–\(endStr)"
-    }
-
-    private func setupScheduleBinding() {
-        // Override the app-level binding with one that respects manual override
-        scheduleManager.onScheduleChange = { shouldBeActive in
-            guard !manualOverride else { return }
-            if shouldBeActive && !activityManager.isActive {
-                activityManager.start()
-            } else if !shouldBeActive && activityManager.isActive {
-                activityManager.stop()
-            }
-        }
     }
 }

@@ -1,39 +1,70 @@
 import Foundation
 import Combine
+import os.log
+
+private let logger = Logger(subsystem: "com.slacktive.app", category: "ScheduleManager")
 
 final class ScheduleManager: ObservableObject {
     @Published var isScheduleEnabled: Bool {
-        didSet { UserDefaults.standard.set(isScheduleEnabled, forKey: "scheduleEnabled") }
+        didSet {
+            UserDefaults.standard.set(isScheduleEnabled, forKey: "scheduleEnabled")
+            // When schedule is toggled, immediately apply it
+            if isScheduleEnabled {
+                applyScheduleNow()
+            }
+        }
     }
     @Published var startHour: Int {
-        didSet { UserDefaults.standard.set(startHour, forKey: "startHour") }
+        didSet {
+            let clamped = clamp(startHour, min: 0, max: 23)
+            if startHour != clamped { startHour = clamped; return }
+            UserDefaults.standard.set(startHour, forKey: "startHour")
+        }
     }
     @Published var startMinute: Int {
-        didSet { UserDefaults.standard.set(startMinute, forKey: "startMinute") }
+        didSet {
+            let clamped = clamp(startMinute, min: 0, max: 59)
+            if startMinute != clamped { startMinute = clamped; return }
+            UserDefaults.standard.set(startMinute, forKey: "startMinute")
+        }
     }
     @Published var endHour: Int {
-        didSet { UserDefaults.standard.set(endHour, forKey: "endHour") }
+        didSet {
+            let clamped = clamp(endHour, min: 0, max: 23)
+            if endHour != clamped { endHour = clamped; return }
+            UserDefaults.standard.set(endHour, forKey: "endHour")
+        }
     }
     @Published var endMinute: Int {
-        didSet { UserDefaults.standard.set(endMinute, forKey: "endMinute") }
+        didSet {
+            let clamped = clamp(endMinute, min: 0, max: 59)
+            if endMinute != clamped { endMinute = clamped; return }
+            UserDefaults.standard.set(endMinute, forKey: "endMinute")
+        }
     }
     @Published var activeDays: Set<Int> {
-        didSet { UserDefaults.standard.set(Array(activeDays), forKey: "activeDays") }
+        didSet {
+            // Filter to only valid weekday values (1–7)
+            let valid = activeDays.filter { (1...7).contains($0) }
+            if valid != activeDays { activeDays = valid; return }
+            UserDefaults.standard.set(Array(activeDays), forKey: "activeDays")
+        }
     }
 
-    private var checkTimer: Timer?
+    private var checkTimer: DispatchSourceTimer?
+    private let scheduleQueue = DispatchQueue(label: "com.slacktive.schedule", qos: .utility)
     var onScheduleChange: ((Bool) -> Void)?
 
     init() {
         let defaults = UserDefaults.standard
         self.isScheduleEnabled = defaults.bool(forKey: "scheduleEnabled")
-        self.startHour = defaults.object(forKey: "startHour") as? Int ?? 9
-        self.startMinute = defaults.object(forKey: "startMinute") as? Int ?? 0
-        self.endHour = defaults.object(forKey: "endHour") as? Int ?? 17
-        self.endMinute = defaults.object(forKey: "endMinute") as? Int ?? 0
+        self.startHour = Swift.min(Swift.max(defaults.object(forKey: "startHour") as? Int ?? 9, 0), 23)
+        self.startMinute = Swift.min(Swift.max(defaults.object(forKey: "startMinute") as? Int ?? 0, 0), 59)
+        self.endHour = Swift.min(Swift.max(defaults.object(forKey: "endHour") as? Int ?? 17, 0), 23)
+        self.endMinute = Swift.min(Swift.max(defaults.object(forKey: "endMinute") as? Int ?? 0, 0), 59)
 
         if let savedDays = defaults.array(forKey: "activeDays") as? [Int] {
-            self.activeDays = Set(savedDays)
+            self.activeDays = Set(savedDays.filter { (1...7).contains($0) })
         } else {
             // Monday(2) through Friday(6) in Calendar weekday format
             self.activeDays = Set(2...6)
@@ -42,6 +73,8 @@ final class ScheduleManager: ObservableObject {
         startMonitoring()
     }
 
+    /// Whether the current time falls within the configured schedule.
+    /// Safe to call from any thread — reads only value-type published properties.
     var isWithinSchedule: Bool {
         guard isScheduleEnabled else { return false }
 
@@ -54,22 +87,38 @@ final class ScheduleManager: ObservableObject {
         guard activeDays.contains(weekday) else { return false }
 
         let currentMinutes = hour * 60 + minute
-        let startMinutes = startHour * 60 + startMinute
-        let endMinutes = endHour * 60 + endMinute
+        let startMinutes = startHour * 60 + self.startMinute
+        let endMinutes = endHour * 60 + self.endMinute
+
+        // If start == end, the schedule window is zero-length → never active
+        guard startMinutes < endMinutes else {
+            logger.warning("Schedule start (\(startMinutes)m) >= end (\(endMinutes)m) — schedule is effectively disabled")
+            return false
+        }
 
         return currentMinutes >= startMinutes && currentMinutes < endMinutes
     }
 
     func applyScheduleNow() {
         guard isScheduleEnabled else { return }
-        onScheduleChange?(isWithinSchedule)
+        let shouldBeActive = isWithinSchedule
+        DispatchQueue.main.async { [weak self] in
+            self?.onScheduleChange?(shouldBeActive)
+        }
     }
 
     private func startMonitoring() {
-        checkTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+        let timer = DispatchSource.makeTimerSource(queue: scheduleQueue)
+        timer.schedule(deadline: .now() + .seconds(60), repeating: .seconds(60), leeway: .seconds(5))
+        timer.setEventHandler { [weak self] in
             guard let self, self.isScheduleEnabled else { return }
-            self.onScheduleChange?(self.isWithinSchedule)
+            let shouldBeActive = self.isWithinSchedule
+            DispatchQueue.main.async { [weak self] in
+                self?.onScheduleChange?(shouldBeActive)
+            }
         }
+        timer.resume()
+        checkTimer = timer
     }
 
     var startTime: Date {
@@ -99,6 +148,13 @@ final class ScheduleManager: ObservableObject {
     static let weekdayIndices = [1, 2, 3, 4, 5, 6, 7]
 
     deinit {
-        checkTimer?.invalidate()
+        checkTimer?.cancel()
+    }
+
+    // MARK: - Helpers
+
+    private func clamp(_ value: Int, min lo: Int, max hi: Int) -> Int {
+        Swift.min(Swift.max(value, lo), hi)
     }
 }
+

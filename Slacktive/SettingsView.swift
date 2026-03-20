@@ -1,8 +1,12 @@
 import SwiftUI
 import ServiceManagement
+import os.log
+
+private let logger = Logger(subsystem: "com.slacktive.app", category: "SettingsView")
 
 struct SettingsView: View {
     @EnvironmentObject var scheduleManager: ScheduleManager
+    @EnvironmentObject var activityManager: ActivityManager
     @State private var launchAtLogin = false
 
     var body: some View {
@@ -31,6 +35,18 @@ struct SettingsView: View {
                             Text("End").font(.caption).foregroundColor(.secondary)
                             DatePicker("", selection: $scheduleManager.endTime, displayedComponents: .hourAndMinute)
                                 .labelsHidden()
+                        }
+                    }
+
+                    // Validation warning
+                    if scheduleManager.startHour * 60 + scheduleManager.startMinute >= scheduleManager.endHour * 60 + scheduleManager.endMinute {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                            Text("Start time must be before end time")
+                                .font(.caption)
+                                .foregroundColor(.orange)
                         }
                     }
 
@@ -79,14 +95,6 @@ struct SettingsView: View {
         .onAppear {
             launchAtLogin = SMAppService.mainApp.status == .enabled
         }
-        .onReceive(scheduleManager.objectWillChange) { _ in
-            DispatchQueue.main.async {
-                if let window = NSApp.windows.first(where: { $0.title == "Slacktive Settings" }) {
-                    window.makeKeyAndOrderFront(nil)
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-            }
-        }
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
@@ -97,7 +105,7 @@ struct SettingsView: View {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            print("Launch at login error: \(error)")
+            logger.error("Launch at login error: \(error.localizedDescription)")
             // Revert the toggle to reflect actual state
             launchAtLogin = SMAppService.mainApp.status == .enabled
         }

@@ -36,11 +36,20 @@ func generateIcon(size: Int, scale: Int, outputPath: String) {
         return
     }
 
-    try! pngData.write(to: URL(fileURLWithPath: outputPath))
-    print("Generated: \(outputPath) (\(pixelSize)x\(pixelSize))")
+    do {
+        try pngData.write(to: URL(fileURLWithPath: outputPath))
+        print("Generated: \(outputPath) (\(pixelSize)x\(pixelSize))")
+    } catch {
+        print("Failed to write \(outputPath): \(error.localizedDescription)")
+    }
 }
 
-let basePath = "/Users/jp/slacktive/Slacktive/Assets.xcassets/AppIcon.appiconset"
+// Derive the asset path relative to this script's location
+// Script is at: <project>/scripts/generate-icon.swift
+// Target is at: <project>/Slacktive/Assets.xcassets/AppIcon.appiconset/
+let scriptDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+let projectDir = scriptDir.deletingLastPathComponent()
+let basePath = projectDir.appendingPathComponent("Slacktive/Assets.xcassets/AppIcon.appiconset").path
 
 let configs: [(size: Int, scale: Int, filename: String)] = [
     (16, 1, "icon_16x16.png"),
